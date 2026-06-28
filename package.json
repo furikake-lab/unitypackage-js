@@ -44,7 +44,7 @@
     "prepare": "husky"
   },
   "dependencies": {
-    "js-yaml": "^4.1.0",
+    "js-yaml": "^4.3.0",
     "nanotar": "^0.2.0"
   },
   "devDependencies": {
