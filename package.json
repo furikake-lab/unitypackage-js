@@ -41,7 +41,7 @@
     "lint:fix": "eslint . --fix",
     "format:check": "prettier --check .",
     "format:write": "prettier --write .",
-    "prepare": "husky"
+    "prepare": "npm run build && husky"
   },
   "dependencies": {
     "js-yaml": "^4.1.0",

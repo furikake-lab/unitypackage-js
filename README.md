@@ -16,8 +16,26 @@ Unity PackageはUnityエディタで使用されるアセットパッケージ�
 
 ## インストール
 
+このパッケージはnpmレジストリには公開していません。GitHubリポジトリから直接インストールしてください。
+
 ```bash
-npm install unitypackage-js
+npm install github:furikake-lab/unitypackage-js
+```
+
+`package.json`へ直接追加する場合は、次のように指定できます。
+
+```json
+{
+  "dependencies": {
+    "unitypackage-js": "github:furikake-lab/unitypackage-js"
+  }
+}
+```
+
+再現可能なビルドにする場合は、ブランチ名、タグ、またはコミットSHAを`#`に続けて指定してください。
+
+```bash
+npm install github:furikake-lab/unitypackage-js#<commit-sha>
 ```
 
 ## 基本的な使い方
