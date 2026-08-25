@@ -38,6 +38,12 @@ npm install github:furikake-lab/unitypackage-js
 npm install github:furikake-lab/unitypackage-js#<commit-sha>
 ```
 
+## 開発環境
+
+開発およびCIでのビルドにはNode.js 20を使用します。パッケージ利用時のブラウザ環境・ランタイム要件とは別の方針です。
+
+Pull RequestのCIでは、`npm run build`に加えて`npm run verify:package`を実行します。後者はnpm配布内容、CommonJS / ES Modulesのエントリーポイント、およびTypeScript型定義の解決を検証します。
+
 ## 基本的な使い方
 
 ### 1. UnityPackageの読み込み

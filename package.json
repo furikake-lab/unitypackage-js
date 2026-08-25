@@ -33,6 +33,7 @@
   },
   "scripts": {
     "build": "tsup",
+    "verify:package": "node scripts/verify-package.mjs",
     "dev": "tsup --watch",
     "test": "vitest run",
     "test:watch": "vitest",
