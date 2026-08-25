@@ -24,12 +24,38 @@ type PropertyDrafts = Record<string, Record<string, string>>;
 const componentKey = (fileId: string, scriptGuid?: string) =>
   `${fileId}-${scriptGuid ?? 'unknown'}`;
 
+const loadPrefab = (unityPackage: UnityPackage, assetPath: string) => {
+  const source = { sourcePackage: unityPackage, sourcePath: assetPath };
+  try {
+    const prefab = unityPackage.getPrefab(assetPath);
+    if (!prefab) {
+      return {
+        prefab: null,
+        parseError: 'Prefab asset not found in the package.',
+        ...source,
+      };
+    }
+    return { prefab, parseError: null, ...source };
+  } catch (error) {
+    return {
+      prefab: null,
+      parseError:
+        error instanceof Error
+          ? error.message
+          : 'Failed to load Prefab from UnityPackage',
+      ...source,
+    };
+  }
+};
+
 export function PrefabEditor({
   unityPackage,
   asset,
   onSave,
 }: PrefabEditorProps) {
-  const [reloadToken, setReloadToken] = useState(0);
+  const [loadedPrefab, setLoadedPrefab] = useState(() =>
+    loadPrefab(unityPackage, asset.assetPath),
+  );
   const [statusByAsset, setStatusByAsset] = useState<Record<string, string>>(
     {},
   );
@@ -40,26 +66,14 @@ export function PrefabEditor({
   const assetKey = asset.assetPath;
   const status = statusByAsset[assetKey] ?? null;
 
-  const { prefab, parseError } = useMemo(() => {
-    try {
-      const prefab = unityPackage.getPrefab(asset.assetPath);
-      if (!prefab) {
-        return {
-          prefab: null,
-          parseError: 'Prefab asset not found in the package.',
-        };
-      }
-      return { prefab, parseError: null };
-    } catch (error) {
-      return {
-        prefab: null,
-        parseError:
-          error instanceof Error
-            ? error.message
-            : 'Failed to load Prefab from UnityPackage',
-      };
-    }
-  }, [asset.assetPath, unityPackage]);
+  if (
+    loadedPrefab.sourcePackage !== unityPackage ||
+    loadedPrefab.sourcePath !== asset.assetPath
+  ) {
+    setLoadedPrefab(loadPrefab(unityPackage, asset.assetPath));
+  }
+
+  const { prefab, parseError } = loadedPrefab;
 
   const resetPrefab = () => {
     setPropertyDrafts({});
@@ -69,7 +83,7 @@ export function PrefabEditor({
       delete next[assetKey];
       return next;
     });
-    setReloadToken((v) => v + 1);
+    setLoadedPrefab(loadPrefab(unityPackage, assetKey));
   };
 
   const handlePropertyChange = (

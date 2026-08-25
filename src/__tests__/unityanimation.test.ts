@@ -136,6 +136,7 @@ describe('UnityAnimation', () => {
       const newCurve = {
         attribute: 'test.attribute',
         path: 'test/path',
+        classID: 1,
         keyframes: [
           {
             time: 0,
@@ -166,6 +167,7 @@ describe('UnityAnimation', () => {
       const updatedCurve = {
         attribute: 'material._MainTex_ST.x',
         path: '',
+        classID: 23,
         keyframes: [
           {
             time: 0,
@@ -271,6 +273,7 @@ describe('UnityAnimation', () => {
       original.addCurve({
         attribute: 'new.attribute',
         path: 'new/path',
+        classID: 224,
         keyframes: [
           {
             time: 0,
@@ -293,6 +296,7 @@ describe('UnityAnimation', () => {
       const newCurve = reimported.getCurve('new.attribute', 'new/path');
       expect(newCurve).toBeDefined();
       expect(newCurve!.keyframes[0].value).toBe(5);
+      expect(newCurve!.classID).toBe(224);
     });
 
     it('複数回のラウンドトリップでデータが保持される', () => {

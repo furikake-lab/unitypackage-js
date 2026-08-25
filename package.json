@@ -36,6 +36,7 @@
     "verify:package": "node scripts/verify-package.mjs",
     "dev": "tsup --watch",
     "test": "vitest run",
+    "typecheck": "tsc --noEmit",
     "test:watch": "vitest",
     "example:react": "cd examples/react-demo && npm run dev",
     "lint": "eslint .",
