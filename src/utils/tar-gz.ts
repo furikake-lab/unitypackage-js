@@ -37,6 +37,7 @@ export async function extractTarGz(
   } catch (error) {
     throw new Error(
       `tar.gz展開エラー: ${error instanceof Error ? error.message : String(error)}`,
+      { cause: error },
     );
   }
 }
@@ -66,6 +67,7 @@ export async function compressTarGz(
   } catch (error) {
     throw new Error(
       `tar.gz圧縮エラー: ${error instanceof Error ? error.message : String(error)}`,
+      { cause: error },
     );
   }
 }

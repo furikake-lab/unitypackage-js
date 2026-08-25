@@ -48,10 +48,10 @@
     "nanotar": "^0.2.0"
   },
   "devDependencies": {
-    "@eslint/js": "^9.39.1",
+    "@eslint/js": "^10.0.1",
     "@types/js-yaml": "^4.0.9",
     "@types/node": "^20.0.0",
-    "eslint": "^9.39.1",
+    "eslint": "^10.9.1",
     "eslint-config-prettier": "^10.1.8",
     "eslint-plugin-react-hooks": "^7.0.1",
     "eslint-plugin-react-refresh": "^0.4.24",
