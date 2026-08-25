@@ -18,10 +18,21 @@ const publicEntries = [
 ].map((entry) => entry.replace(/^\.\//, ''));
 
 const packResult = JSON.parse(
-  execFileSync('npm', ['pack', '--dry-run', '--json', '--ignore-scripts'], {
-    cwd: root,
-    encoding: 'utf8',
-  }),
+  // npm 10 may run `prepare` despite `--ignore-scripts`; keep its output out of JSON.
+  execFileSync(
+    'npm',
+    [
+      'pack',
+      '--dry-run',
+      '--json',
+      '--ignore-scripts',
+      '--foreground-scripts=false',
+    ],
+    {
+      cwd: root,
+      encoding: 'utf8',
+    },
+  ),
 )[0];
 const packedFiles = new Set(packResult.files.map(({ path: file }) => file));
 
