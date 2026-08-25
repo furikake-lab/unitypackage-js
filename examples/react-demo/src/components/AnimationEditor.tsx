@@ -33,7 +33,32 @@ interface KeyframeDraft {
 interface CurveDraft extends KeyframeDraft {
   attribute: string;
   path: string;
+  classID: number | string;
 }
+
+const loadAnimation = (unityPackage: UnityPackage, assetPath: string) => {
+  const source = { sourcePackage: unityPackage, sourcePath: assetPath };
+  try {
+    const animation = unityPackage.getAnimation(assetPath);
+    if (!animation) {
+      return {
+        animation: null,
+        parseError: 'Animation asset not found in the package.',
+        ...source,
+      };
+    }
+    return { animation, parseError: null, ...source };
+  } catch (error) {
+    return {
+      animation: null,
+      parseError:
+        error instanceof Error
+          ? error.message
+          : 'Failed to load animation from UnityPackage',
+      ...source,
+    };
+  }
+};
 
 const defaultKeyframeValues: Keyframe = {
   time: 0,
@@ -52,7 +77,9 @@ export function AnimationEditor({
   onSave,
 }: AnimationEditorProps) {
   const [version, setVersion] = useState(0);
-  const [reloadToken, setReloadToken] = useState(0);
+  const [loadedAnimation, setLoadedAnimation] = useState(() =>
+    loadAnimation(unityPackage, asset.assetPath),
+  );
   const [statusByAsset, setStatusByAsset] = useState<Record<string, string>>(
     {},
   );
@@ -61,6 +88,7 @@ export function AnimationEditor({
       ({
         attribute: '',
         path: '',
+        classID: 1,
         time: 0,
         value: 0,
       }) satisfies CurveDraft,
@@ -75,26 +103,14 @@ export function AnimationEditor({
   const status = statusByAsset[assetKey] ?? null;
   const draftKeyframes = draftKeyframesByAsset[assetKey] ?? {};
 
-  const { animation, parseError } = useMemo(() => {
-    try {
-      const animation = unityPackage.getAnimation(asset.assetPath);
-      if (!animation) {
-        return {
-          animation: null,
-          parseError: 'Animation asset not found in the package.',
-        };
-      }
-      return { animation, parseError: null };
-    } catch (error) {
-      return {
-        animation: null,
-        parseError:
-          error instanceof Error
-            ? error.message
-            : 'Failed to load animation from UnityPackage',
-      };
-    }
-  }, [asset.assetPath, unityPackage]);
+  if (
+    loadedAnimation.sourcePackage !== unityPackage ||
+    loadedAnimation.sourcePath !== asset.assetPath
+  ) {
+    setLoadedAnimation(loadAnimation(unityPackage, asset.assetPath));
+  }
+
+  const { animation, parseError } = loadedAnimation;
 
   const refresh = () => setVersion((v) => v + 1);
 
@@ -109,9 +125,9 @@ export function AnimationEditor({
       ...prev,
       [assetKey]: {},
     }));
-    setReloadToken((v) => v + 1);
+    setLoadedAnimation(loadAnimation(unityPackage, assetKey));
     refresh();
-  }, [assetKey]);
+  }, [assetKey, unityPackage]);
 
   const updateKeyframe = (
     curve: FloatCurve,
@@ -164,6 +180,7 @@ export function AnimationEditor({
     animation.addCurve({
       attribute: newCurve.attribute.trim(),
       path: newCurve.path.trim(),
+      classID: typeof newCurve.classID === 'number' ? newCurve.classID : 1,
       keyframes: [
         {
           ...defaultKeyframeValues,
@@ -173,7 +190,7 @@ export function AnimationEditor({
       ],
     });
 
-    setNewCurve({ attribute: '', path: '', time: 0, value: 0 });
+    setNewCurve({ attribute: '', path: '', classID: 1, time: 0, value: 0 });
     refresh();
     setStatusByAsset((prev) => ({
       ...prev,
@@ -409,6 +426,15 @@ export function AnimationEditor({
                   />
                 </Group>
                 <Group>
+                  <NumberInput
+                    label="Class ID"
+                    value={newCurve.classID}
+                    onChange={(value) =>
+                      setNewCurve((prev) => ({ ...prev, classID: value ?? 1 }))
+                    }
+                    min={1}
+                    step={1}
+                  />
                   <NumberInput
                     label="First keyframe time"
                     value={newCurve.time}
