@@ -460,6 +460,61 @@ GameObject:
     });
   });
 
+  describe('開始・終了時間', () => {
+    // TextureMove.anim（FloatCurveは0〜1秒）に3秒までのPPtrCurveを追加したもの
+    const withPPtrCurve = () =>
+      textureMoveAnimYaml.replace(
+        '  m_PPtrCurves: []',
+        [
+          '  m_PPtrCurves:',
+          '  - curve:',
+          '    - time: 0',
+          '      value: {fileID: 0}',
+          '    - time: 3',
+          '      value: {fileID: 0}',
+          '    attribute: m_Sprite',
+          '    path: ',
+          '    classID: 212',
+          '    script: {fileID: 0}',
+          '    flags: 2',
+        ].join('\n'),
+      );
+
+    const settingsOf = (yamlContent: string) =>
+      parseAnimationClip(yamlContent).m_AnimationClipSettings as ParsedEntry;
+
+    it('curveを変更しなければ開始・終了時間を変えない', () => {
+      // 最初のキーが0.5秒のクリップでも、元のm_StartTime: 0を保つ
+      const shifted = textureMoveAnimYaml.replace(/time: 0$/gm, 'time: 0.5');
+      const anim = new UnityAnimation(shifted);
+
+      expect(settingsOf(anim.exportToYaml())).toEqual(settingsOf(shifted));
+      expect(settingsOf(anim.exportToYaml()).m_StartTime).toBe(0);
+    });
+
+    it('curveを変更しても開始時間は元の値を保つ', () => {
+      const shifted = textureMoveAnimYaml.replace(/time: 0$/gm, 'time: 0.5');
+      const anim = new UnityAnimation(shifted);
+      anim.removeCurve('material._MainTex_ST.x', '');
+
+      expect(settingsOf(anim.exportToYaml()).m_StartTime).toBe(0);
+    });
+
+    it('PPtrCurveのキーも終了時間に含める', () => {
+      const anim = new UnityAnimation(withPPtrCurve());
+      anim.removeCurve('material._MainTex_ST.x', '');
+
+      expect(settingsOf(anim.exportToYaml()).m_StopTime).toBe(3);
+    });
+
+    it('キーを追加すると終了時間が延びる', () => {
+      const anim = new UnityAnimation(textureMoveAnimYaml);
+      anim.addEulerCurve(createEulerCurve('Armature/Page_Flip'));
+
+      expect(settingsOf(anim.exportToYaml()).m_StopTime).toBe(2);
+    });
+  });
+
   describe('ラウンドトリップでの元データの保持', () => {
     it('変更せずに書き出すとFloatCurveのアニメーションの内容が変わらない', () => {
       const anim = new UnityAnimation(textureMoveAnimYaml);

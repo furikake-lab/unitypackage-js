@@ -74,10 +74,12 @@ const DEFAULT_WEIGHT = 0.33333334;
 const DEFAULT_ROTATION_ORDER = 4;
 
 // 未対応のcurve（キーの時間範囲の計算にのみ利用する）
+// m_PPtrCurvesは`curve`が{time, value}の配列で、他は`curve.m_Curve`にキーを持つ
 const UNMANAGED_CURVE_KEYS = [
   'm_RotationCurves',
   'm_PositionCurves',
   'm_ScaleCurves',
+  'm_PPtrCurves',
 ] as const;
 
 /**
@@ -738,12 +740,25 @@ export class UnityAnimation {
   }
 
   /**
-   * アニメーションクリップの設定を生成（開始・終了時間を全キーフレームから計算）
+   * 読み込み時点からFloat曲線・Euler回転曲線のいずれかが変更（追加・削除を含む）されたか
+   */
+  private hasCurveChanges(): boolean {
+    return (
+      this._floatCurves.length !== this._originalFloatCurves.size ||
+      this._eulerCurves.length !== this._originalEulerCurves.size ||
+      this._floatCurves.some((c) => !this.unchangedFloatOriginal(c)) ||
+      this._eulerCurves.some((c) => !this.unchangedEulerOriginal(c))
+    );
+  }
+
+  /**
+   * アニメーションクリップの設定を生成
+   * curveが変更された場合のみ、開始・終了時間を全キーフレームに合わせて更新する
    */
   private buildAnimationClipSettings(): RawData {
-    const settings = {
-      ...((this._originalParsedData.m_AnimationClipSettings as RawData) ?? {}),
-    };
+    const original =
+      (this._originalParsedData.m_AnimationClipSettings as RawData) ?? {};
+    if (!this.hasCurveChanges()) return original;
 
     const times: number[] = [
       ...this._floatCurves.flatMap((c) => c.keyframes.map((kf) => kf.time)),
@@ -752,17 +767,37 @@ export class UnityAnimation {
     // 未対応のcurveのキーフレームも時間範囲に含める
     for (const key of UNMANAGED_CURVE_KEYS) {
       for (const entry of this.asRawArray(this._originalParsedData[key])) {
-        const curve = entry.curve as { m_Curve?: unknown } | undefined;
-        for (const kf of this.asRawArray(curve?.m_Curve)) {
+        const keyframes = Array.isArray(entry.curve)
+          ? entry.curve
+          : (entry.curve as { m_Curve?: unknown } | undefined)?.m_Curve;
+        for (const kf of this.asRawArray(keyframes)) {
           if (typeof kf.time === 'number') times.push(kf.time);
         }
       }
     }
+    if (times.length === 0) return original;
 
-    if (times.length > 0) {
-      settings.m_StartTime = Math.min(...times);
-      settings.m_StopTime = Math.max(...times);
+    let minTime = Infinity;
+    let maxTime = -Infinity;
+    for (const time of times) {
+      minTime = Math.min(minTime, time);
+      maxTime = Math.max(maxTime, time);
     }
+
+    const settings = { ...original };
+    // 開始時間は元の値（多くは0）を保ち、それより前のキーがある場合のみ広げる
+    settings.m_StartTime =
+      typeof original.m_StartTime === 'number'
+        ? Math.min(original.m_StartTime, minTime)
+        : minTime;
+    // m_CompressedRotationCurvesはキー時間を読めないため、元の終了時間より短くしない
+    const hasCompressedCurves =
+      this.asRawArray(this._originalParsedData.m_CompressedRotationCurves)
+        .length > 0;
+    settings.m_StopTime =
+      hasCompressedCurves && typeof original.m_StopTime === 'number'
+        ? Math.max(original.m_StopTime, maxTime)
+        : maxTime;
     return settings;
   }
 
@@ -787,6 +822,8 @@ export class UnityAnimation {
         this._animationName = (parsed.m_Name as string) || '';
 
         // m_FloatCurvesを抽出
+        // Note: 同じclassID・path・attributeのcurveが重複している場合（Unityは通常出力しない）、
+        //       元データとしては後のものが優先され、m_EditorCurvesの重複エントリは1本にまとめられる
         const floatCurvesData = this.asRawArray(parsed.m_FloatCurves);
         this._floatCurves = floatCurvesData.map((raw) =>
           this.parseFloatCurve(raw),
