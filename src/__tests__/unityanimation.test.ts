@@ -19,6 +19,7 @@ const STANDARD_PACKAGE_PATH = join(FIXTURES_DIR, 'standard.unitypackage');
 // テスト用のアニメーションデータ
 let textureMoveAnimYaml: string;
 let hopAnimYaml: string;
+let rotateAnimYaml: string;
 
 /**
  * YAMLのAnimationClip部分を解析する（空の値はnullになるため空文字列に正規化）
@@ -87,6 +88,8 @@ beforeAll(async () => {
       textureMoveAnimYaml = new TextDecoder().decode(asset.assetData);
     } else if (assetPath.endsWith('Hop.anim')) {
       hopAnimYaml = new TextDecoder().decode(asset.assetData);
+    } else if (assetPath.endsWith('Rotate.anim')) {
+      rotateAnimYaml = new TextDecoder().decode(asset.assetData);
     }
   }
 
@@ -95,6 +98,9 @@ beforeAll(async () => {
   }
   if (!hopAnimYaml) {
     throw new Error('Hop.anim not found in standard.unitypackage');
+  }
+  if (!rotateAnimYaml) {
+    throw new Error('Rotate.anim not found in standard.unitypackage');
   }
 });
 
@@ -544,6 +550,103 @@ GameObject:
       expect(exported.m_ClipBindingConstant).toEqual(
         original.m_ClipBindingConstant,
       );
+    });
+  });
+
+  describe('Unityで作成したEulerCurveの読み込み', () => {
+    it('EulerCurveを読み込める', () => {
+      const anim = new UnityAnimation(rotateAnimYaml);
+
+      expect(anim.getName()).toBe('Rotate');
+      expect(anim.getFloatCurves()).toEqual([]);
+      expect(anim.getEulerCurves().length).toBe(1);
+
+      const curve = anim.getEulerCurve('Pivot');
+      expect(curve).toBeDefined();
+      expect(curve!.rotationOrder).toBe(4);
+      expect(curve!.keyframes.map((kf) => kf.time)).toEqual([0, 0.5, 1]);
+      expect(curve!.keyframes.map((kf) => kf.value)).toEqual([
+        vec(0, 0, 0),
+        vec(90, 0, 90),
+        vec(0, 0, 180),
+      ]);
+    });
+
+    it('段差のキー（Infinityの傾き）を読み込める', () => {
+      const anim = new UnityAnimation(rotateAnimYaml);
+      const stepKey = anim.getEulerCurve('Pivot')!.keyframes[1];
+
+      expect(stepKey.inSlope.x).toBe(Infinity);
+      expect(stepKey.outSlope.x).toBe(Infinity);
+      expect(stepKey.inSlope.z).toBe(180);
+    });
+
+    it('変更せずに書き出すと内容が変わらない', () => {
+      const anim = new UnityAnimation(rotateAnimYaml);
+
+      expect(parseAnimationClip(anim.exportToYaml())).toEqual(
+        parseAnimationClip(rotateAnimYaml),
+      );
+    });
+
+    it('UnityのgenericBindingのpathがCRC32と一致する', () => {
+      const original = parseAnimationClip(rotateAnimYaml);
+      const bindings = (original.m_ClipBindingConstant as ParsedEntry)
+        .genericBindings as ParsedEntry[];
+
+      expect(bindings[0]).toMatchObject({
+        path: crc32('Pivot'),
+        attribute: 4,
+        typeID: 4,
+        customType: 4,
+      });
+    });
+
+    it('キーフレームを追加するとm_EditorCurvesの各軸に反映される', () => {
+      const anim = new UnityAnimation(rotateAnimYaml);
+      anim.addEulerKeyframe(
+        'Pivot',
+        eulerKeyframe(2, vec(0, 0, 0), vec(0, 0, Infinity)),
+      );
+
+      const original = parseAnimationClip(rotateAnimYaml);
+      const exported = parseAnimationClip(anim.exportToYaml());
+
+      const editorCurves = exported.m_EditorCurves as ParsedEntry[];
+      expect(editorCurves.map((c) => c.attribute)).toEqual([
+        'localEulerAnglesRaw.x',
+        'localEulerAnglesRaw.y',
+        'localEulerAnglesRaw.z',
+      ]);
+      const zKeys = (editorCurves[2].curve as { m_Curve: ParsedEntry[] })
+        .m_Curve;
+      expect(zKeys.map((kf) => kf.time)).toEqual([0, 0.5, 1, 2]);
+      expect(zKeys[3].inSlope).toBe('Infinity');
+
+      // bindingとm_EulerEditorCurvesは変わらず、終了時間が延びる
+      expect(exported.m_ClipBindingConstant).toEqual(
+        original.m_ClipBindingConstant,
+      );
+      expect(exported.m_EulerEditorCurves).toEqual(
+        original.m_EulerEditorCurves,
+      );
+      expect((exported.m_AnimationClipSettings as ParsedEntry).m_StopTime).toBe(
+        2,
+      );
+    });
+
+    it('EulerCurveを削除すると派生データも削除される', () => {
+      const anim = new UnityAnimation(rotateAnimYaml);
+      anim.removeEulerCurve('Pivot');
+
+      const exported = parseAnimationClip(anim.exportToYaml());
+
+      expect(exported.m_EulerCurves).toEqual([]);
+      expect(exported.m_EditorCurves).toEqual([]);
+      expect(exported.m_EulerEditorCurves).toEqual([]);
+      expect(
+        (exported.m_ClipBindingConstant as ParsedEntry).genericBindings,
+      ).toEqual([]);
     });
   });
 
