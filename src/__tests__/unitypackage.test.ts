@@ -464,6 +464,9 @@ describe('実際のUnityPackageとの互換性', () => {
       'Colorful.mat',
       'Colorful.png',
       'Cube.prefab',
+      'Rotate.anim',
+      'RotateRoot.controller',
+      'RotateRoot.prefab',
       'README.md',
     ];
 

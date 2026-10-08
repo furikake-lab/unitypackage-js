@@ -6,4 +6,7 @@ export {
   UnityAnimation,
   type Keyframe,
   type FloatCurve,
+  type Vector3,
+  type Vector3Keyframe,
+  type EulerCurve,
 } from './unityanimation';
