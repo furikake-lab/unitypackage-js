@@ -50,12 +50,19 @@ interface EulerCurveEditorProps {
 
 const AXES = ['x', 'y', 'z'] as const;
 
+// ライブラリのremoveEulerKeyframeと同じ許容誤差で同じ時間のキーを判定する
+const hasKeyframeAt = (curve: EulerCurve, time: number, exceptIndex?: number) =>
+  curve.keyframes.some(
+    (kf, index) => index !== exceptIndex && Math.abs(kf.time - time) <= 0.001,
+  );
+
 const toNumber = (value: number | string) =>
   typeof value === 'number' ? value : 0;
 
 const uniform = (value: number): Vector3 => ({ x: value, y: value, z: value });
 
 // 段差のキーは傾きを∞にする（Unityの Both Tangents > Constant 相当）
+// Stepを外した場合は傾きを一律0に戻す（元の傾きは保持しない簡易実装）
 const isStep = (kf: Vector3Keyframe) =>
   AXES.every(
     (axis) => kf.inSlope[axis] === Infinity && kf.outSlope[axis] === Infinity,
@@ -93,16 +100,27 @@ export function EulerCurveEditor({
     index: number,
     partial: Partial<Vector3Keyframe>,
   ) => {
+    if (
+      partial.time !== undefined &&
+      hasKeyframeAt(curve, partial.time, index)
+    ) {
+      onChange(`A keyframe already exists at time ${partial.time}.`);
+      return;
+    }
     curve.keyframes[index] = { ...curve.keyframes[index], ...partial };
     curve.keyframes.sort((a, b) => a.time - b.time);
     onChange();
   };
 
   const handleAddKeyframe = (curve: EulerCurve) => {
-    animation.addEulerKeyframe(
-      curve.path,
-      createKeyframe(drafts[curve.path] ?? emptyEulerKeyframeDraft),
+    const keyframe = createKeyframe(
+      drafts[curve.path] ?? emptyEulerKeyframeDraft,
     );
+    if (hasKeyframeAt(curve, keyframe.time)) {
+      onChange(`A keyframe already exists at time ${keyframe.time}.`);
+      return;
+    }
+    animation.addEulerKeyframe(curve.path, keyframe);
     onDraftChange(curve.path, emptyEulerKeyframeDraft);
     onChange();
   };
@@ -131,7 +149,10 @@ export function EulerCurveEditor({
           {curves.map((curve) => {
             const draft = drafts[curve.path] ?? emptyEulerKeyframeDraft;
             return (
-              <Accordion.Item value={curve.path} key={curve.path}>
+              <Accordion.Item
+                value={curve.path || '(root)'}
+                key={curve.path || '(root)'}
+              >
                 <Accordion.Control>
                   <Group gap="xs">
                     <Text fw={600}>localEulerAngles</Text>
@@ -160,18 +181,24 @@ export function EulerCurveEditor({
                         {curve.keyframes.map((kf, index) => (
                           <Table.Tr key={`${curve.path}-${index}`}>
                             <Table.Td width={110}>
+                              {/* 入力途中の値で他のキーと時間が重複しないよう、フォーカスを外したときに反映する */}
                               <NumberInput
-                                value={kf.time}
+                                key={`${index}-${kf.time}`}
+                                defaultValue={kf.time}
                                 step={0.01}
                                 size="xs"
-                                onChange={(value) =>
-                                  updateKeyframe(curve, index, {
-                                    time:
-                                      typeof value === 'number'
-                                        ? value
-                                        : kf.time,
-                                  })
-                                }
+                                onBlur={(event) => {
+                                  const input =
+                                    event.currentTarget.value.trim();
+                                  const time = Number(input);
+                                  if (
+                                    input !== '' &&
+                                    Number.isFinite(time) &&
+                                    time !== kf.time
+                                  ) {
+                                    updateKeyframe(curve, index, { time });
+                                  }
+                                }}
                               />
                             </Table.Td>
                             {AXES.map((axis) => (
