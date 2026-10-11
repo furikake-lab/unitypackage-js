@@ -135,7 +135,7 @@ console.log(`FloatCurve数: ${curves.length}`);
 // 特定のFloatCurveを取得
 const curve = anim.getCurve('material._MainTex_ST.x', '');
 if (curve) {
-  console.log(`キーフレーム数: ${curve.curve.m_Curve.length}`);
+  console.log(`キーフレーム数: ${curve.keyframes.length}`);
 }
 
 // 新しいキーフレームを追加
@@ -155,32 +155,62 @@ anim.removeKeyframe('material._MainTex_ST.x', '', 0.5);
 
 // 新しいFloatCurveを追加
 anim.addCurve({
-  curve: {
-    path: '',
-    attribute: 'material._Color.r',
-    script: { fileID: 0 },
-    classID: 0,
-    m_Curve: [
-      {
-        time: 0,
-        value: 1,
-        inSlope: 0,
-        outSlope: 0,
-        tangentMode: 136,
-        weightedMode: 0,
-        inWeight: 0.33333334,
-        outWeight: 0.33333334,
-      },
-    ],
-    m_PreInfinity: 2,
-    m_PostInfinity: 2,
-    m_RotationOrder: 4,
-  },
   attribute: 'material._Color.r',
+  path: '',
+  classID: 23,
+  keyframes: [
+    {
+      time: 0,
+      value: 1,
+      inSlope: 0,
+      outSlope: 0,
+      tangentMode: 136,
+      weightedMode: 0,
+      inWeight: 0.33333334,
+      outWeight: 0.33333334,
+    },
+  ],
 });
 
 // FloatCurveを削除
 anim.removeCurve('material._Color.r', '');
+
+// Euler回転のcurveを追加（値・傾き・重みは{x, y, z}で指定）
+const weight = { x: 0.33333334, y: 0.33333334, z: 0.33333334 };
+anim.addEulerCurve({
+  path: 'Armature/Root/Page',
+  rotationOrder: 4,
+  keyframes: [
+    {
+      time: 0,
+      value: { x: 0, y: 0, z: 0 },
+      inSlope: { x: 0, y: 0, z: 0 },
+      outSlope: { x: 0, y: 0, z: 0 },
+      tangentMode: 0,
+      weightedMode: 0,
+      inWeight: weight,
+      outWeight: weight,
+    },
+  ],
+});
+
+// Euler回転のcurveにキーフレームを追加（傾きをInfinityにすると段差になる）
+anim.addEulerKeyframe('Armature/Root/Page', {
+  time: 1,
+  value: { x: 0, y: 0, z: 180 },
+  inSlope: { x: 0, y: 0, z: Infinity },
+  outSlope: { x: 0, y: 0, z: Infinity },
+  tangentMode: 0,
+  weightedMode: 0,
+  inWeight: weight,
+  outWeight: weight,
+});
+
+// Euler回転のcurveを取得・削除
+const eulerCurve = anim.getEulerCurve('Armature/Root/Page');
+console.log(`Euler curveのキーフレーム数: ${eulerCurve?.keyframes.length}`);
+anim.removeEulerKeyframe('Armature/Root/Page', 1);
+anim.removeEulerCurve('Armature/Root/Page');
 
 // 編集したYAMLをエクスポート
 const updatedYaml = anim.exportToYaml();
@@ -198,7 +228,8 @@ const newPackageData = await pkg.export();
 
 **注意事項:**
 
-- `UnityAnimation`クラスは現在FloatCurveのみをサポートしています。PositionCurves、RotationCurves、ScaleCurves等は未対応であり、これらを含むアニメーションへの利用は非推奨です
+- `UnityAnimation`クラスで編集できるのはFloatCurveとEulerCurve（Euler角による回転）のみです。PositionCurves、RotationCurves（Quaternion）、ScaleCurves、PPtrCurves等は編集できませんが、元のデータ（対応する`m_EditorCurves`・`genericBindings`を含む）はそのまま保持されます
+- 書き出し時、`m_EditorCurves`・`m_EulerEditorCurves`・`m_ClipBindingConstant.genericBindings`・`m_AnimationClipSettings`の開始/終了時間は編集内容に合わせて更新されます。新規に追加したcurveのbindingのpath・attributeはUnityと同じくCRC32で出力します（material系プロパティのattributeはUnityのハッシュと一致しないため、Unityでの再インポート時に再構築される想定です）
 
 #### 構造化データの書き換え
 
