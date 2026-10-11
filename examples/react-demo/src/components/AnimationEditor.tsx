@@ -18,6 +18,11 @@ import {
   type UnityAsset,
   type UnityPackage,
 } from 'unitypackage-js';
+import {
+  EulerCurveEditor,
+  type EulerCurveDraft,
+  type EulerKeyframeDraft,
+} from './EulerCurveEditor';
 
 interface AnimationEditorProps {
   unityPackage: UnityPackage;
@@ -96,6 +101,17 @@ export function AnimationEditor({
   const [draftKeyframesByAsset, setDraftKeyframesByAsset] = useState<
     Record<string, Record<string, KeyframeDraft>>
   >({});
+  const [eulerDraftsByAsset, setEulerDraftsByAsset] = useState<
+    Record<string, Record<string, EulerKeyframeDraft>>
+  >({});
+  const [newEulerCurve, setNewEulerCurve] = useState<EulerCurveDraft>({
+    path: '',
+    time: 0,
+    x: 0,
+    y: 0,
+    z: 0,
+    step: false,
+  });
 
   const encoder = useMemo(() => new TextEncoder(), []);
 
@@ -122,6 +138,10 @@ export function AnimationEditor({
       return next;
     });
     setDraftKeyframesByAsset((prev) => ({
+      ...prev,
+      [assetKey]: {},
+    }));
+    setEulerDraftsByAsset((prev) => ({
       ...prev,
       [assetKey]: {},
     }));
@@ -240,8 +260,8 @@ export function AnimationEditor({
         </Group>
 
         <Text size="sm" c="dimmed">
-          Adjust AnimationClip name and float curves using the unityanimations
-          helper.
+          Adjust AnimationClip name, float curves and euler rotation curves
+          using the unityanimations helper.
         </Text>
 
         {parseError && (
@@ -457,6 +477,28 @@ export function AnimationEditor({
                 </Group>
               </Stack>
             </Paper>
+
+            <EulerCurveEditor
+              animation={animation}
+              drafts={eulerDraftsByAsset[assetKey] ?? {}}
+              newCurveDraft={newEulerCurve}
+              onDraftChange={(path, draft) =>
+                setEulerDraftsByAsset((prev) => ({
+                  ...prev,
+                  [assetKey]: { ...(prev[assetKey] ?? {}), [path]: draft },
+                }))
+              }
+              onNewCurveDraftChange={setNewEulerCurve}
+              onChange={(message) => {
+                refresh();
+                if (message) {
+                  setStatusByAsset((prev) => ({
+                    ...prev,
+                    [assetKey]: message,
+                  }));
+                }
+              }}
+            />
 
             <Group justify="flex-end">
               <Button variant="default" onClick={reloadAnimation}>
